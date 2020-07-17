@@ -10,3 +10,11 @@ api_platform:
     # Mercure integration, remove if unwanted
     mercure:
         hub_url: '%env(MERCURE_SUBSCRIBE_URL)%'
+    collection:
+        order_parameter_name: 'order'
+        pagination:
+            client_enabled: true
+            enabled_parameter_name: pagination
+            items_per_page: 30
+            client_items_per_page: true
+            items_per_page_parameter_name: itemsPerPage
