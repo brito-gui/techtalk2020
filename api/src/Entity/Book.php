@@ -3,8 +3,8 @@
 namespace App\Entity;
 
 use ApiPlatform\Core\Annotation\ApiFilter;
+use ApiPlatform\Core\Annotation\ApiProperty;
 use ApiPlatform\Core\Annotation\ApiResource;
-use ApiPlatform\Core\Annotation\ApiSubresource;
 use ApiPlatform\Core\Bridge\Doctrine\Orm\Filter\BooleanFilter;
 use ApiPlatform\Core\Bridge\Doctrine\Orm\Filter\DateFilter;
 use ApiPlatform\Core\Bridge\Doctrine\Orm\Filter\ExistsFilter;
@@ -15,24 +15,56 @@ use ApiPlatform\Core\Serializer\Filter\PropertyFilter;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
+use Ramsey\Uuid\Uuid;
+use Symfony\Component\Serializer\Annotation\Groups;
 use Symfony\Component\Validator\Constraints as Assert;
 
 /**
  * @ApiResource(
+ *      itemOperations={
+ *          "get"={
+ *              "method"="GET",
+ *              "path"="/books/{id}",
+ *          },
+ *          "patch",
+ *          "put",
+ *          "delete",
+ *      },
  *      attributes={
  *          "normalization_context"={
  *               "datetime_format"="Y-m-d",
+ *               "groups"={
+ *                  "book:read",
+ *                  "default"
+ *               }
  *          },
  *          "denormalization_context"={
  *               "datetime_format"="Y-m-d",
+ *               "groups"={
+ *                  "book:write",
+ *                  "default"
+ *               }
  *          },
  *      }
  * )
  *
  * @ApiFilter(DateFilter::class, properties={"publicationDate"})
- * @ApiFilter(SearchFilter::class, properties={"id": "exact", "isbn": "exact", "description": "partial", "author": "partial", "reviews.rating": "exact"})
+ * @ApiFilter(SearchFilter::class,
+ *      properties={
+ *          "id": "exact",
+ *          "isbn": "exact",
+ *          "description": "partial",
+ *          "author": "partial",
+ *          "reviews.rating": "exact"
+ *      }
+ * )
  * @ApiFilter(RangeFilter::class, properties={"pageCount"})
- * @ApiFilter(ExistsFilter::class, properties={"isbn", "publicationDate", "reviews"})
+ * @ApiFilter(ExistsFilter::class,
+ *      properties={
+ *          "publicationDate",
+ *          "reviews"
+ *      }
+ * )
  * @ApiFilter(OrderFilter::class,
  *      properties={
  *          "publicationDate": { "nulls_comparison": OrderFilter::NULLS_SMALLEST, "default_direction": "DESC" },
@@ -47,23 +79,36 @@ use Symfony\Component\Validator\Constraints as Assert;
 class Book
 {
     /**
-     * @ORM\Id()
-     * @ORM\GeneratedValue()
-     * @ORM\Column(type="integer")
+     * @var Uuid
+     *
+     * @ORM\Id
+     * @ORM\Column(type="uuid")
+     * @ORM\GeneratedValue(strategy="CUSTOM")
+     * @ORM\CustomIdGenerator(class="Ramsey\Uuid\Doctrine\UuidGenerator")
+     *
+     * @ApiProperty(identifier=false)
+     *
+     * @Groups({"book:read", "default"})
      */
-    private $id;
+    protected $id;
 
     /**
      * @ORM\Column(type="string", length=255, nullable=true)
      *
      * @Assert\Isbn()
+     *
+     * @ApiProperty(identifier=true)
+     *
+     * @Groups({"book:read", "book:write"})
      */
     private $isbn;
 
     /**
      * @ORM\Column(type="string", length=255)
-     * 
+     *
      * @Assert\NotBlank()
+     *
+     * @Groups({"book:read", "book:write", "default"})
      */
     private $title;
 
@@ -71,6 +116,8 @@ class Book
      * @ORM\Column(type="text")
      *
      * @Assert\NotBlank()
+     *
+     * @Groups({"book:read", "book:write"})
      */
     private $description;
 
@@ -78,31 +125,19 @@ class Book
      * @ORM\Column(type="integer", nullable=true)
      *
      * @Assert\Type("integer")
+     *
+     * @Groups({"book:read", "book:write"})
      */
     private $pageCount;
 
     /**
      * @ORM\Column(type="string", length=255)
+     *
+     * @Assert\NotBlank()
+     *
+     * @Groups({"book:read", "book:write"})
      */
     private $author;
-
-    /**
-     * @var \DateTime
-     * 
-     * @ORM\Column(type="datetime", nullable=true)
-     *
-     * @Assert\Type("\DateTimeInterface")
-     */
-    private $publicationDate;
-
-    /**
-     * @var Collection|Review[]
-     *
-     * @ORM\OneToMany(targetEntity="App\Entity\Review", mappedBy="book")
-     *
-     * @ApiSubresource
-     */
-    private $reviews;
 
     /**
      * @var bool
@@ -110,15 +145,37 @@ class Book
      * @ORM\Column(type="boolean")
      *
      * @Assert\Type("boolean")
+     *
+     * @Groups({"book:read", "book:write"})
      */
     private $published;
+
+    /**
+     * @var \DateTime
+     *
+     * @ORM\Column(type="datetime", nullable=true)
+     *
+     * @Assert\Type("\DateTimeInterface")
+     *
+     * @Groups({"book:read", "book:write"})
+     */
+    private $publicationDate;
+
+    /**
+     * @var Collection|Review[]
+     *
+     * @ORM\OneToMany(targetEntity="App\Entity\Review", mappedBy="book", cascade={"persist"})
+     *
+     * @Groups({"book:read"})
+     */
+    private $reviews;
 
     public function __construct()
     {
         $this->reviews = new ArrayCollection();
     }
 
-    public function getId(): ?int
+    public function getId(): ?Uuid
     {
         return $this->id;
     }

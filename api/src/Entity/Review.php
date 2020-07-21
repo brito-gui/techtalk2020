@@ -10,11 +10,42 @@ use ApiPlatform\Core\Bridge\Doctrine\Orm\Filter\RangeFilter;
 use ApiPlatform\Core\Bridge\Doctrine\Orm\Filter\SearchFilter;
 use ApiPlatform\Core\Serializer\Filter\PropertyFilter;
 use Doctrine\ORM\Mapping as ORM;
+use Ramsey\Uuid\Uuid;
+use Symfony\Component\Serializer\Annotation\Groups;
 use Symfony\Component\Validator\Constraints as Assert;
 
 /**
- * @ApiResource()
+ * @ApiResource(
+ *      itemOperations={
+ *          "get"={
+ *              "method"="GET",
+ *              "path"="/reviews/{id}",
+ *          },
+ *          "get_book_reviews_subresource"={
+ *              "method"="GET",
+ *              "path"="/books/{uuid}/all-reviews",
+ *              "controller"=\App\Controller\GetBooksReviewsController::class,
+ *              "normalization_context"={"groups"={"review:read"}},
+ *              "read"=false,
+ *          },
+ *          "patch",
+ *          "put",
+ *          "delete",
+ *      },
+ *      attributes={
+ *          "normalization_context"={
+ *               "datetime_format"="Y-m-d H:i:s",
+ *               "groups"={"review:read", "default"}
+ *          },
+ *          "denormalization_context"={
+ *               "datetime_format"="Y-m-d H:i:s",
+ *               "groups"={"review:write", "default"}
+ *          },
+ *      },
+ *      denormalizationContext={"groups"={"review:write", "default"}}
+ * )
  * @ORM\Entity(repositoryClass="App\Repository\ReviewRepository")
+ * @ORM\HasLifecycleCallbacks()
  *
  * @ApiFilter(DateFilter::class, properties={"publicationDate"})
  * @ApiFilter(RangeFilter::class, properties={"rating"})
@@ -29,16 +60,23 @@ use Symfony\Component\Validator\Constraints as Assert;
 class Review
 {
     /**
-     * @ORM\Id()
-     * @ORM\GeneratedValue()
-     * @ORM\Column(type="integer")
+     * @var Uuid
+     *
+     * @ORM\Id
+     * @ORM\Column(type="uuid")
+     * @ORM\GeneratedValue(strategy="CUSTOM")
+     * @ORM\CustomIdGenerator(class="Ramsey\Uuid\Doctrine\UuidGenerator")
+     *
+     * @Groups({"review:read", "default"})
      */
-    private $id;
+    protected $id;
 
     /**
      * @ORM\Column(type="smallint")
      *
      * @Assert\Range(min=0, max=5)
+     *
+     * @Groups({"review:read", "review:write"})
      */
     private $rating;
 
@@ -46,32 +84,40 @@ class Review
      * @ORM\Column(type="text")
      *
      * @Assert\NotBlank
+     *
+     * @Groups({"review:read", "review:write"})
      */
     private $body;
 
     /**
      * @ORM\Column(type="string", length=255)
      *
-     * @Assert\NotBlank
+     * @Assert\NotBlank()
+     *
+     * @Groups({"review:read", "review:write"})
      */
     private $author;
 
     /**
      * @ORM\Column(type="datetime", length=255, nullable=false)
      *
-     * @Assert\DateTime
+     * @Assert\Type("\DateTimeInterface")
+     *
+     * @Groups({"review:read"})
      */
-    private $publicationDate;
+    private $createdAt;
 
     /**
      * @ORM\ManyToOne(targetEntity="App\Entity\Book", inversedBy="reviews")
      * @ORM\JoinColumn(nullable=false)
      *
      * @Assert\NotNull
+     *
+     * @Groups({"review:read", "review:write"})
      */
     private $book;
 
-    public function getId(): ?int
+    public function getId(): ?Uuid
     {
         return $this->id;
     }
@@ -112,14 +158,17 @@ class Review
         return $this;
     }
 
-    public function getPublicationDate(): ?\DateTimeInterface
+    public function getCreatedAt(): ?\DateTimeInterface
     {
-        return $this->publicationDate;
+        return $this->createdAt;
     }
 
-    public function setPublicationDate(?\DateTimeInterface $publicationDate): self
+    /**
+     * @ORM\PrePersist()
+     */
+    public function generateCreatedAt(): self
     {
-        $this->publicationDate = $publicationDate;
+        $this->createdAt = new \DateTime('now');
 
         return $this;
     }
