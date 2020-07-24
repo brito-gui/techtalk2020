@@ -2,7 +2,7 @@ api_platform:
     eager_loading:
         max_joins: 100
         force_eager: false
-    title: Hello API Platform
+    title: Tech Talk Printi - API Platform
     version: 1.0.0
     mapping:
         paths: ['%kernel.project_dir%/src/Entity']
